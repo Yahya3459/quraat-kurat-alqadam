@@ -127,13 +127,13 @@
                 <div id="winner-announcement" class="w-full text-center hidden min-h-[80px]">
                     <p class="text-sm text-gray-500 mb-1">الاسم الفائز</p>
                     <h2 id="winner-name" class="text-3xl font-extrabold text-green-600 animate-bounce">اسم الفائز هنا</h2>
-                    <p id="winner-team" class="text-lg font-bold text-gray-700 mt-1">تمت إضافته للفريق 1.1</p>
+                    <p id="winner-team" class="text-lg font-bold text-gray-700 mt-1">تمت إضافته للفريق A (1.1)</p>
                 </div>
 
                 <!-- Actions -->
                 <div class="mt-6 flex gap-3 w-full justify-center">
                     <button id="reset-btn" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg transition-colors">إعادة ضبط القرعة</button>
-                    <button id="copy-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-md">نسخ النتائج</button>
+                    <button id="copy-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-md">نسخ النتائج + صورة</button>
                 </div>
             </div>
 
@@ -208,6 +208,8 @@
         
         // Grouping logic state
         const totalTeams = 4;
+        const teamLabels = ['A', 'B', 'C', 'D'];
+        const getTeamLabel = (teamNumber) => teamLabels[teamNumber - 1] || String(teamNumber);
         let currentTeamIndex = 1;   // Ranges from 1 to 4 (الفريق الأول إلى الفريق الرابع)
         let currentPlayerRound = 1; // Rounds: .1, .2, .3, etc.
 
@@ -399,7 +401,7 @@
             
             // Display Winner
             winnerNameEl.textContent = winnerName;
-            winnerTeamEl.textContent = `تم إضافته للفريق ${currentCode}`;
+            winnerTeamEl.textContent = `تمت إضافته للفريق ${getTeamLabel(currentTeamNum)} (${currentCode})`;
             winnerAnnouncement.classList.remove('hidden');
             
             // Save Result
@@ -481,7 +483,7 @@
 
                 teamCard.innerHTML = `
                     <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-black text-lg text-blue-800">الفريق ${i}</h3>
+                        <h3 class="font-black text-lg text-blue-800">الفريق ${getTeamLabel(i)}</h3>
                         <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${teamMembers.length} أعضاء</span>
                     </div>
                     <ul class="space-y-1">
@@ -535,7 +537,7 @@
 
             let textToCopy = "نتائج القرعة:\n\n";
             for (let i = 1; i <= totalTeams; i++) {
-                textToCopy += `--- الفريق ${i} ---\n`;
+                textToCopy += `--- الفريق ${getTeamLabel(i)} ---\n`;
                 const teamMembers = assignedResults.filter(r => r.teamNumber === i);
                 if (teamMembers.length === 0) {
                     textToCopy += "لا يوجد أعضاء\n";
@@ -554,12 +556,117 @@
             el.select();
             try {
                 document.execCommand('copy');
-                showMessage("تم النسخ", "تم نسخ نتائج القرعة إلى الحافظة.");
+                generatePrintableImage();
+                showMessage("تم النسخ والتجهيز", "تم نسخ النتائج إلى الحافظة وتجهيز صورة PNG جاهزة للطباعة.");
             } catch (err) {
                 showMessage("خطأ", "فشل نسخ النتائج.");
             }
             document.body.removeChild(el);
         });
+
+        // Generate a polished, print-ready PNG containing the logo and four teams.
+        function generatePrintableImage() {
+            const canvasImage = document.createElement('canvas');
+            const ctxImage = canvasImage.getContext('2d');
+            const width = 1600;
+            const height = 1260;
+            const margin = 80;
+            const gap = 36;
+            const cardWidth = (width - (margin * 2) - gap) / 2;
+            const cardHeight = 380;
+            const cardStartY = 360;
+
+            canvasImage.width = width;
+            canvasImage.height = height;
+
+            const drawImage = (logo) => {
+                ctxImage.fillStyle = '#f8fafc';
+                ctxImage.fillRect(0, 0, width, height);
+
+                ctxImage.fillStyle = '#1d4ed8';
+                ctxImage.fillRect(0, 0, width, 18);
+
+                if (logo && logo.complete && logo.naturalWidth) {
+                    const logoWidth = 430;
+                    const logoHeight = Math.min(180, logoWidth * (logo.naturalHeight / logo.naturalWidth));
+                    ctxImage.drawImage(logo, (width - logoWidth) / 2, 42, logoWidth, logoHeight);
+                }
+
+                ctxImage.direction = 'rtl';
+                ctxImage.textAlign = 'center';
+                ctxImage.fillStyle = '#1e3a8a';
+                ctxImage.font = '800 52px Tajawal, Arial, sans-serif';
+                ctxImage.fillText('نتائج قرعة توزيع الفرق', width / 2, 285);
+                ctxImage.fillStyle = '#64748b';
+                ctxImage.font = '500 25px Tajawal, Arial, sans-serif';
+                ctxImage.fillText('قرعة كرت القدم', width / 2, 325);
+
+                for (let i = 1; i <= totalTeams; i++) {
+                    const column = (i - 1) % 2;
+                    const row = Math.floor((i - 1) / 2);
+                    const x = margin + column * (cardWidth + gap);
+                    const y = cardStartY + row * (cardHeight + gap);
+                    const members = assignedResults.filter(result => result.teamNumber === i);
+
+                    ctxImage.fillStyle = '#ffffff';
+                    ctxImage.strokeStyle = '#dbeafe';
+                    ctxImage.lineWidth = 3;
+                    ctxImage.beginPath();
+                    ctxImage.roundRect(x, y, cardWidth, cardHeight, 24);
+                    ctxImage.fill();
+                    ctxImage.stroke();
+
+                    ctxImage.fillStyle = '#eff6ff';
+                    ctxImage.beginPath();
+                    ctxImage.roundRect(x, y, cardWidth, 82, 24);
+                    ctxImage.fill();
+                    ctxImage.fillStyle = '#1d4ed8';
+                    ctxImage.fillRect(x, y + 58, cardWidth, 24);
+
+                    ctxImage.direction = 'rtl';
+                    ctxImage.textAlign = 'right';
+                    ctxImage.font = '800 34px Tajawal, Arial, sans-serif';
+                    ctxImage.fillStyle = '#1e3a8a';
+                    ctxImage.fillText(`الفريق ${getTeamLabel(i)}`, x + cardWidth - 28, y + 52);
+
+                    ctxImage.textAlign = 'right';
+                    ctxImage.font = '500 25px Tajawal, Arial, sans-serif';
+                    members.forEach((member, index) => {
+                        const lineY = y + 132 + index * 38;
+                        ctxImage.fillStyle = '#334155';
+                        ctxImage.fillText(member.name, x + cardWidth - 36, lineY);
+                        ctxImage.textAlign = 'left';
+                        ctxImage.font = '700 21px Tajawal, Arial, sans-serif';
+                        ctxImage.fillStyle = '#2563eb';
+                        ctxImage.fillText(member.fullCode, x + 36, lineY);
+                        ctxImage.textAlign = 'right';
+                        ctxImage.font = '500 25px Tajawal, Arial, sans-serif';
+                    });
+
+                    if (members.length === 0) {
+                        ctxImage.textAlign = 'center';
+                        ctxImage.fillStyle = '#94a3b8';
+                        ctxImage.font = 'italic 24px Tajawal, Arial, sans-serif';
+                        ctxImage.fillText('في انتظار القرعة...', x + cardWidth / 2, y + 190);
+                    }
+                }
+
+                ctxImage.textAlign = 'center';
+                ctxImage.fillStyle = '#64748b';
+                ctxImage.font = '500 22px Tajawal, Arial, sans-serif';
+                ctxImage.fillText('Created by Eng. Yahya Al-Marisi', width / 2, height - 34);
+
+                const downloadLink = document.createElement('a');
+                downloadLink.download = 'نتائج-قرعة-كرت-القدم.png';
+                downloadLink.href = canvasImage.toDataURL('image/png');
+                downloadLink.click();
+            };
+
+            const logo = new Image();
+            logo.onload = () => drawImage(logo);
+            logo.onerror = () => drawImage(null);
+            logo.src = `alc_logo.svg?print=${Date.now()}`;
+        }
 
         // Reset functionality
         resetBtn.addEventListener('click', () => {
