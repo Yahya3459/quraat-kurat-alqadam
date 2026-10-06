@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>قرعة المجموعات</title>
+    <title>دوري كرة القدم لطلاب مركز الأمجاد للغات</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js"></script>
@@ -98,7 +98,7 @@
         
         <header class="text-center mb-8 flex flex-col items-center">
             <img src="alc_logo.svg" alt="شعار المركز" class="h-32 md:h-40 mb-4 object-contain" onerror="this.style.display='none'">
-            <h1 class="text-4xl md:text-5xl font-extrabold text-blue-800 mb-2 drop-shadow-sm">قرعة توزيع الفرق</h1>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-blue-800 mb-2 drop-shadow-sm">دوري كرة القدم لطلاب مركز الأمجاد للغات</h1>
         </header>
 
         <div class="flex flex-col lg:flex-row gap-8">
@@ -591,20 +591,26 @@
                 ctxImage.fillStyle = '#1d4ed8';
                 ctxImage.fillRect(0, 0, width, 18);
 
-                if (logo && logo.complete && logo.naturalWidth) {
-                    const logoWidth = 430;
-                    const logoHeight = Math.min(180, logoWidth * (logo.naturalHeight / logo.naturalWidth));
-                    ctxImage.drawImage(logo, (width - logoWidth) / 2, 42, logoWidth, logoHeight);
+                if (logo && logo.complete && logo.naturalWidth && logo.naturalHeight) {
+                    // Contain the complete logo inside a box while preserving its exact aspect ratio.
+                    const maxLogoWidth = 520;
+                    const maxLogoHeight = 190;
+                    const logoRatio = logo.naturalWidth / logo.naturalHeight;
+                    const logoWidth = Math.min(maxLogoWidth, maxLogoHeight * logoRatio);
+                    const logoHeight = logoWidth / logoRatio;
+                    const logoX = (width - logoWidth) / 2;
+                    const logoY = 34 + (maxLogoHeight - logoHeight) / 2;
+                    ctxImage.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
                 }
 
                 ctxImage.direction = 'rtl';
                 ctxImage.textAlign = 'center';
                 ctxImage.fillStyle = '#1e3a8a';
                 ctxImage.font = '800 52px Tajawal, Arial, sans-serif';
-                ctxImage.fillText('نتائج قرعة توزيع الفرق', width / 2, 285);
+                ctxImage.fillText('نتائج دوري كرة القدم', width / 2, 285);
                 ctxImage.fillStyle = '#64748b';
                 ctxImage.font = '500 25px Tajawal, Arial, sans-serif';
-                ctxImage.fillText('قرعة كرت القدم', width / 2, 325);
+                ctxImage.fillText('لطلاب مركز الأمجاد للغات', width / 2, 325);
 
                 for (let i = 1; i <= totalTeams; i++) {
                     const column = (i - 1) % 2;
