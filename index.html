@@ -554,14 +554,20 @@
             el.value = textToCopy;
             document.body.appendChild(el);
             el.select();
+            let copySucceeded = true;
             try {
                 document.execCommand('copy');
-                generatePrintableImage();
-                showMessage("تم النسخ والتجهيز", "تم نسخ النتائج إلى الحافظة وتجهيز صورة PNG جاهزة للطباعة.");
             } catch (err) {
-                showMessage("خطأ", "فشل نسخ النتائج.");
+                copySucceeded = false;
             }
             document.body.removeChild(el);
+
+            generatePrintableImage();
+            if (copySucceeded) {
+                showMessage("تم النسخ والتجهيز", "تم نسخ النتائج إلى الحافظة وتجهيز صورة PNG جاهزة للطباعة.");
+            } else {
+                showMessage("تم تجهيز الصورة", "تعذر نسخ النص تلقائيًا، لكن تم إنشاء صورة PNG جاهزة للطباعة.");
+            }
         });
 
         // Generate a polished, print-ready PNG containing the logo and four teams.
