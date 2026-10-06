@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>قرعة المجموعات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js"></script>
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f3f4f6;
+            overflow-x: hidden;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+        }
+
+        #wheel-canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 5s cubic-bezier(0.25, 0.1, 0.15, 1);
+        }
+
+        .wheel-pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #ef4444; /* Tailwind red-500 */
+            z-index: 10;
+            filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.25));
+        }
+
+        .spin-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #ffffff 0%, #f3f4f6 100%);
+            border-radius: 50%;
+            border: 4px solid #3b82f6; /* Tailwind blue-500 */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+            color: #1d4ed8;
+            cursor: pointer;
+            z-index: 5;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .spin-btn:active:not(:disabled) {
+            transform: translate(-50%, -50%) scale(0.95);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .spin-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        
+        <header class="text-center mb-8 flex flex-col items-center">
+            <img src="alc_logo.svg" alt="شعار المركز" class="h-32 md:h-40 mb-4 object-contain" onerror="this.style.display='none'">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-blue-800 mb-2 drop-shadow-sm">قرعة توزيع الفرق</h1>
+            <p class="text-lg text-gray-600">سيتم سحب الأسماء وتوزيعها على الفرق تباعاً</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <!-- Left Side: Wheel & Current Status -->
+            <div class="w-full lg:w-1/2 flex flex-col items-center bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                
+                <div class="w-full flex justify-between items-center mb-6 px-4 bg-blue-50 py-3 rounded-lg border border-blue-100">
+                    <div class="text-center">
+                        <span class="block text-sm text-gray-500 font-bold">الفريق القادم</span>
+                        <span id="next-team-display" class="text-2xl font-black text-blue-600">1.1</span>
+                    </div>
+                    <div class="text-center">
+                        <span class="block text-sm text-gray-500 font-bold">المتبقي</span>
+                        <span id="remaining-count" class="text-2xl font-black text-red-500">23</span>
+                    </div>
+                </div>
+
+                <div class="wheel-container mb-8">
+                    <div class="wheel-pointer"></div>
+                    <canvas id="wheel-canvas" width="500" height="500"></canvas>
+                    <button id="spin-btn" class="spin-btn shadow-inner">سحب</button>
+                </div>
+
+                <div id="winner-announcement" class="w-full text-center hidden min-h-[80px]">
+                    <p class="text-sm text-gray-500 mb-1">الاسم الفائز</p>
+                    <h2 id="winner-name" class="text-3xl font-extrabold text-green-600 animate-bounce">اسم الفائز هنا</h2>
+                    <p id="winner-team" class="text-lg font-bold text-gray-700 mt-1">تمت إضافته للفريق 1.1</p>
+                </div>
+
+                <!-- Actions -->
+                <div class="mt-6 flex gap-3 w-full justify-center">
+                    <button id="reset-btn" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg transition-colors">إعادة ضبط القرعة</button>
+                    <button id="copy-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-md">نسخ النتائج</button>
+                </div>
+            </div>
+
+            <div class="w-full lg:w-1/2 bg-white p-6 rounded-2xl shadow-lg border border-gray-100 flex flex-col max-h-[800px]">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">نتائج السحب</h2>
+                
+                <div class="flex-1 overflow-y-auto custom-scrollbar pr-2" id="results-container">
+                    <!-- Teams will be dynamically injected here -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="teams-grid">
+                        <!-- Example format:
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <h3 class="font-black text-lg text-blue-800 mb-2">الفريق 1</h3>
+                            <ul class="space-y-1">
+                                <li class="flex justify-between items-center text-sm p-1 hover:bg-white rounded"><span class="font-bold">1.1</span> <span>زهير الغزي</span></li>
+                            </ul>
+                        </div>
+                        -->
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t text-center text-sm text-gray-500">
+                    تم الانتهاء من <span id="completed-count" class="font-bold text-blue-600">0</span> اسم
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="message-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity duration-300 opacity-0">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl transform scale-95 transition-transform duration-300" id="modal-content">
+            <h3 class="text-xl font-bold mb-4 text-center text-gray-800" id="modal-title">تنبيه</h3>
+            <p class="text-gray-600 mb-6 text-center" id="modal-body">نص التنبيه</p>
+            <button id="modal-close-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors">حسناً</button>
+        </div>
+    </div>
+
+    <script>
+        // Initial list provided by user (23 names)
+        const initialNames = [
+            "زهير الغزي",
+            "عمرو صالح الملاحي",
+            "كهلان القدمي",
+            "صالح البتينة",
+            "محمد الشهاري",
+            "هاشم المروله",
+            "محمد القرماني",
+            "فارس سعدان",
+            "علاء العلفي",
+            "جبران الشوتري",
+            "انس العامري",
+            "المهند علي الواحدي",
+            "محمد عادل المطري",
+            "امير النهمي",
+            "احمد محمد عطيه",
+            "صدام حسين",
+            "احمد قحطان",
+            "مؤيد عبيد",
+            "كمال الضلعي",
+            "محمد زيد الديلمي",
+            "محمد الحداد",
+            "إبراهيم المخلافي",
+            "خالد جابر عمر علي"
+        ];
+
+        // State variables
+        let availableNames = [...initialNames];
+        let assignedResults = []; // Array of objects: { name, teamNumber, playerNumber, fullCode }
+        
+        // Grouping logic state
+        const totalTeams = 4;
+        let currentTeamIndex = 1;   // Ranges from 1 to 4 (الفريق الأول إلى الفريق الرابع)
+        let currentPlayerRound = 1; // Rounds: .1, .2, .3, etc.
+
+        // DOM Elements
+        const canvas = document.getElementById('wheel-canvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spin-btn');
+        const nextTeamDisplay = document.getElementById('next-team-display');
+        const remainingCountDisplay = document.getElementById('remaining-count');
+        const winnerAnnouncement = document.getElementById('winner-announcement');
+        const winnerNameEl = document.getElementById('winner-name');
+        const winnerTeamEl = document.getElementById('winner-team');
+        const teamsGrid = document.getElementById('teams-grid');
+        const completedCountDisplay = document.getElementById('completed-count');
+        const resetBtn = document.getElementById('reset-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const modal = document.getElementById('message-modal');
+
+        // Wheel properties
+        let currentRotation = 0;
+        let isSpinning = false;
+        
+        // A curated palette for wheel slices
+        const colors = [
+            "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", 
+            "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#6366f1",
+            "#eab308", "#84cc16", "#d946ef", "#0ea5e9", "#f43f5e"
+        ];
+
+        function getNextTeamCode() {
+            return `${currentTeamIndex}.${currentPlayerRound}`;
+        }
+
+        function incrementTeamCounters() {
+            currentTeamIndex++;
+            if (currentTeamIndex > totalTeams) {
+                currentTeamIndex = 1; // Reset to team 1
+                currentPlayerRound++; // Move to next player slot (e.g., .2)
+            }
+        }
+
+        function updateStatusDisplays() {
+            remainingCountDisplay.textContent = availableNames.length;
+            completedCountDisplay.textContent = initialNames.length - availableNames.length;
+            
+            if (availableNames.length > 0) {
+                nextTeamDisplay.textContent = getNextTeamCode();
+            } else {
+                nextTeamDisplay.textContent = "مكتمل";
+                nextTeamDisplay.classList.replace('text-blue-600', 'text-green-500');
+            }
+        }
+
+        function drawWheel() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const numSlices = availableNames.length;
+            
+            // If empty, draw a placeholder
+            if (numSlices === 0) {
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, 2 * Math.PI);
+                ctx.fillStyle = '#e5e7eb';
+                ctx.fill();
+                ctx.fillStyle = '#9ca3af';
+                ctx.font = 'bold 30px Tajawal';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('اكتملت القرعة', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            const sliceAngle = (2 * Math.PI) / numSlices;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = canvas.width / 2;
+
+            for (let i = 0; i < numSlices; i++) {
+                const startAngle = i * sliceAngle;
+                const endAngle = startAngle + sliceAngle;
+
+                // Draw Slice
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                
+                // Draw slice border
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                // Draw Text
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                // Rotate to center of slice
+                const textAngle = startAngle + (sliceAngle / 2);
+                ctx.rotate(textAngle);
+                
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                
+                // Adjust font size based on number of items
+                let fontSize = numSlices > 15 ? 14 : (numSlices > 8 ? 16 : 22);
+                ctx.font = `bold ${fontSize}px Tajawal`;
+                
+                // Move to edge and draw text
+                // Shadow for readability
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 4;
+                
+                const text = availableNames[i];
+                // Truncate long names slightly for fit
+                const displayName = text.length > 15 ? text.substring(0, 15) + '..' : text;
+                
+                ctx.fillText(displayName, radius - 20, 0);
+                ctx.restore();
+            }
+        }
+
+        function easeOutQuart(t) {
+            return 1 - (--t) * t * t * t;
+        }
+
+        function spin() {
+            if (isSpinning || availableNames.length === 0) return;
+            
+            isSpinning = true;
+            spinBtn.disabled = true;
+            winnerAnnouncement.classList.add('hidden');
+            
+            // Calculate random spin
+            const numSlices = availableNames.length;
+            const sliceAngle = 360 / numSlices;
+            
+            // Randomly select a winner index (0 to numSlices - 1)
+            const winningIndex = Math.floor(Math.random() * numSlices);
+            
+            // Calculate angle needed to land on that index.
+            // The pointer is at the TOP (270 degrees in canvas context, but our wheel rotates via CSS)
+            // CSS rotate 0 means the right middle (0 deg) of canvas is on right.
+            // Pointer is at top (-90 deg from center-right).
+            
+            // Let's determine the center angle of the winning slice
+            const centerAngleOfWinner = (winningIndex * sliceAngle) + (sliceAngle / 2);
+            
+            // We want (centerAngleOfWinner + currentRotation) % 360 to equal 270 (top)
+            // So, requiredRotation = 270 - centerAngleOfWinner
+            // Add extra spins for visual effect (e.g., 5 to 10 full rotations)
+            const extraSpins = (Math.floor(Math.random() * 5) + 5) * 360;
+            
+            let targetRotation = 270 - centerAngleOfWinner;
+            
+            // Ensure target is relative to current rotation to always spin forward
+            targetRotation += extraSpins;
+            // Adjust to be strictly increasing relative to currentRotation
+            while (targetRotation <= currentRotation) {
+                targetRotation += 360;
+            }
+
+            const spinDuration = 5000; // 5 seconds
+            
+            // Apply CSS transition
+            canvas.style.transition = `transform ${spinDuration}ms cubic-bezier(0.25, 0.1, 0.15, 1)`;
+            canvas.style.transform = `rotate(${targetRotation}deg)`;
+
+            // Wait for spin to finish
+            setTimeout(() => {
+                handleSpinEnd(winningIndex);
+                currentRotation = targetRotation % 360; // Keep it bounded for next calculations, though CSS handles large numbers
+                // Remove transition momentarily to reset base rotation without animation if we wanted to, 
+                // but keeping it compounding is safer for continuous spinning visual.
+                isSpinning = false;
+                
+                if (availableNames.length > 0) {
+                    spinBtn.disabled = false;
+                }
+            }, spinDuration + 100);
+        }
+
+        function handleSpinEnd(winningIndex) {
+            const winnerName = availableNames[winningIndex];
+            const currentCode = getNextTeamCode();
+            const currentTeamNum = currentTeamIndex;
+            
+            // Display Winner
+            winnerNameEl.textContent = winnerName;
+            winnerTeamEl.textContent = `تم إضافته للفريق ${currentCode}`;
+            winnerAnnouncement.classList.remove('hidden');
+            
+            // Save Result
+            assignedResults.push({
+                name: winnerName,
+                teamNumber: currentTeamNum,
+                playerNumber: currentPlayerRound,
+                fullCode: currentCode
+            });
+
+            // Remove from available names
+            availableNames.splice(winningIndex, 1);
+            
+            // Redraw wheel (reset CSS transform to 0 for the new drawing, but disable transition first)
+            canvas.style.transition = 'none';
+            canvas.style.transform = 'rotate(0deg)';
+            currentRotation = 0;
+            // Force reflow
+            void canvas.offsetWidth;
+            
+            drawWheel();
+
+            // Increment team for next spin
+            incrementTeamCounters();
+            updateStatusDisplays();
+            renderResults();
+
+            // Trigger Confetti safely so it doesn't break the code if it fails to load
+            try {
+                if (typeof confetti === 'function') {
+                    confetti({
+                        particleCount: 100,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#3b82f6', '#10b981', '#ef4444']
+                    });
+                }
+            } catch(e) {
+                console.log('Confetti failed to load', e);
+            }
+
+            if (availableNames.length === 0) {
+                setTimeout(() => {
+                    showMessage("اكتملت القرعة!", "تم توزيع جميع الأسماء بنجاح على الفرق.");
+                }, 1000);
+            }
+        }
+
+        function renderResults() {
+            teamsGrid.innerHTML = '';
+            
+            // Organize results by team
+            const teamsMap = new Map();
+            for (let i = 1; i <= totalTeams; i++) {
+                teamsMap.set(i, []);
+            }
+
+            assignedResults.forEach(res => {
+                teamsMap.get(res.teamNumber).push(res);
+            });
+
+            // Create DOM elements for each team
+            for (let i = 1; i <= totalTeams; i++) {
+                const teamMembers = teamsMap.get(i);
+                
+                const teamCard = document.createElement('div');
+                teamCard.className = 'bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm';
+                
+                let listHtml = teamMembers.map(member => `
+                    <li class="flex justify-between items-center text-sm p-2 hover:bg-white rounded border-b border-transparent hover:border-gray-100 transition-colors">
+                        <span class="font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded">${member.fullCode}</span> 
+                        <span class="font-medium text-gray-800">${member.name}</span>
+                    </li>
+                `).join('');
+
+                if (teamMembers.length === 0) {
+                    listHtml = `<li class="text-sm text-gray-400 text-center py-2 italic">في انتظار القرعة...</li>`;
+                }
+
+                teamCard.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-lg text-blue-800">الفريق ${i}</h3>
+                        <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${teamMembers.length} أعضاء</span>
+                    </div>
+                    <ul class="space-y-1">
+                        ${listHtml}
+                    </ul>
+                `;
+                
+                teamsGrid.appendChild(teamCard);
+            }
+        }
+
+        
+        // Modal functions
+        const modalContent = document.getElementById('modal-content');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        function showMessage(title, message) {
+            modalTitle.textContent = title;
+            modalBody.textContent = message;
+            modal.classList.remove('hidden');
+            // Small delay to allow display:block to apply before animating opacity
+            requestAnimationFrame(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            });
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        modalCloseBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        // Copy functionality
+        copyBtn.addEventListener('click', () => {
+            if (assignedResults.length === 0) {
+                showMessage("فارغ", "لا توجد نتائج لنسخها بعد.");
+                return;
+            }
+
+            let textToCopy = "نتائج القرعة:\n\n";
+            for (let i = 1; i <= totalTeams; i++) {
+                textToCopy += `--- الفريق ${i} ---\n`;
+                const teamMembers = assignedResults.filter(r => r.teamNumber === i);
+                if (teamMembers.length === 0) {
+                    textToCopy += "لا يوجد أعضاء\n";
+                } else {
+                    teamMembers.forEach(m => {
+                        textToCopy += `${m.fullCode} - ${m.name}\n`;
+                    });
+                }
+                textToCopy += "\n";
+            }
+
+            // Create temporary textarea for copying
+            const el = document.createElement('textarea');
+            el.value = textToCopy;
+            document.body.appendChild(el);
+            el.select();
+            try {
+                document.execCommand('copy');
+                showMessage("تم النسخ", "تم نسخ نتائج القرعة إلى الحافظة.");
+            } catch (err) {
+                showMessage("خطأ", "فشل نسخ النتائج.");
+            }
+            document.body.removeChild(el);
+        });
+
+        // Reset functionality
+        resetBtn.addEventListener('click', () => {
+            // Confirmation via custom modal is complex without blocking, we'll just ask using a custom setup or native.
+            // Since alert/confirm are forbidden, we will execute reset directly, but show a success modal.
+            
+            // Reset logic
+            availableNames = [...initialNames];
+            assignedResults = [];
+            currentTeamIndex = 1;
+            currentPlayerRound = 1;
+            
+            canvas.style.transition = 'none';
+            canvas.style.transform = 'rotate(0deg)';
+            currentRotation = 0;
+            
+            winnerAnnouncement.classList.add('hidden');
+            spinBtn.disabled = false;
+            
+            drawWheel();
+            updateStatusDisplays();
+            renderResults();
+            
+            showMessage("إعادة الضبط", "تم إعادة ضبط القرعة للبدء من جديد.");
+        });
+
+        // Spin Event
+        spinBtn.addEventListener('click', spin);
+
+        // Initial setup
+        window.addEventListener('load', () => {
+            drawWheel();
+            updateStatusDisplays();
+            renderResults();
+        });
+
+    </script>
+</body>
+</html>
+
