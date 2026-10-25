@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>قرعة الفائزين بالكلاسيكو | مركز الأمجاد</title>
+  <title>قرعة أصحاب التوقعات الصحيحة | مركز الأمجاد</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js"></script>
@@ -17,6 +17,17 @@
     .person-card { transition: opacity .25s, transform .25s; }
     .person-card.used { opacity: .42; transform: scale(.98); }
     .person-card.winner { outline: 4px solid #10b981; transform: translateY(-5px); }
+    .celebration { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; background: linear-gradient(135deg, rgba(8, 35, 83, .97), rgba(15, 91, 183, .94) 55%, rgba(251, 224, 63, .9)); opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility .35s ease; overflow: hidden; }
+    .celebration.show { opacity: 1; visibility: visible; }
+    .celebration::before, .celebration::after { content: ''; position: absolute; width: 28rem; height: 28rem; border: 2px solid rgba(255,255,255,.25); border-radius: 50%; animation: pulse-ring 2.5s ease-out infinite; }
+    .celebration::after { width: 42rem; height: 42rem; animation-delay: .7s; }
+    .celebration-card { position: relative; z-index: 1; width: min(92vw, 760px); max-height: 94vh; overflow-y: auto; text-align: center; color: white; animation: celebration-in .65s cubic-bezier(.2,.9,.2,1) both; }
+    .celebration-photo { width: min(72vw, 460px); height: min(58vh, 590px); margin: 1.25rem auto; object-fit: cover; object-position: center 30%; border: 8px solid white; border-radius: 2rem; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
+    .celebration-title { font-size: clamp(2rem, 6vw, 4.5rem); line-height: 1.05; font-weight: 900; text-shadow: 0 5px 20px rgba(0,0,0,.25); }
+    .close-celebration { border: 2px solid rgba(255,255,255,.7); background: rgba(255,255,255,.16); color: white; border-radius: 999px; padding: .75rem 1.5rem; font-weight: 800; }
+    @keyframes celebration-in { from { transform: translateY(30px) scale(.9); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+    @keyframes pulse-ring { 0% { transform: scale(.75); opacity: .5; } 100% { transform: scale(1.2); opacity: 0; } }
+    @media (max-width: 640px) { .celebration-photo { height: 52vh; border-width: 5px; border-radius: 1.25rem; } }
   </style>
 </head>
 <body class="min-h-screen text-slate-800 px-4 py-6 md:py-10">
@@ -25,8 +36,8 @@
       <a href="index.html" class="inline-flex items-center gap-2 text-blue-700 font-bold mb-5 hover:text-blue-900">← العودة إلى صفحة القرعات</a>
       <img src="alc_logo.svg" alt="شعار مركز الأمجاد" class="h-24 mx-auto object-contain" onerror="this.style.display='none'">
       <p class="text-emerald-600 font-bold mt-3">توقع نتيجة الكلاسيكو بشكل صحيح</p>
-      <h1 class="text-3xl md:text-5xl font-black text-blue-900 mt-2">قرعة الفائزين</h1>
-      <p class="text-slate-500 mt-3">قرعة عشوائية لاختيار فائز واحد من الطلاب الثلاثة</p>
+      <h1 class="text-3xl md:text-5xl font-black text-blue-900 mt-2">قرعة أصحاب التوقعات الصحيحة</h1>
+      <p class="text-slate-500 mt-3">قرعة عشوائية لاختيار الفائز بالجائزة من أصحاب التوقعات الصحيحة</p>
     </header>
 
     <section class="grid lg:grid-cols-2 gap-8 items-start">
@@ -41,7 +52,7 @@
           <button id="spin" class="spin">اسحب</button>
         </div>
         <div id="announcement" class="hidden mt-7 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-5">
-          <p class="text-emerald-700 font-bold">الفائز في القرعة</p>
+          <p class="text-emerald-700 font-bold">الفائز بالجائزة</p>
           <h2 id="winner" class="text-3xl font-black text-emerald-700 mt-1"></h2>
           <p class="text-slate-500 mt-2">مبروك! نتمنى لك الفوز بالجائزة.</p>
         </div>
@@ -52,7 +63,7 @@
 
       <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-5 md:p-8">
         <div class="flex items-center justify-between border-b pb-4 mb-5">
-          <h2 class="text-2xl font-black text-blue-900">الفائزون الثلاثة</h2>
+          <h2 class="text-2xl font-black text-blue-900">أصحاب التوقعات الصحيحة</h2>
           <span class="rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-bold">توقع 1 - 2</span>
         </div>
         <div id="people" class="grid sm:grid-cols-3 lg:grid-cols-1 gap-4"></div>
@@ -60,6 +71,17 @@
     </section>
     <footer class="text-center text-sm text-slate-400 mt-8">Created by <span class="font-bold text-blue-700">Eng. Yahya Al-Marisi</span></footer>
   </main>
+
+  <div id="celebration" class="celebration" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
+    <div class="celebration-card">
+      <p class="text-yellow-200 text-xl md:text-2xl font-bold">تهانينا!</p>
+      <h2 id="celebration-title" class="celebration-title mt-3">الفائز بالجائزة</h2>
+      <img id="celebration-image" class="celebration-photo" src="" alt="صورة الفائز">
+      <p id="celebration-name" class="text-3xl md:text-5xl font-black"></p>
+      <p class="mt-3 text-lg md:text-xl text-blue-50">صاحب التوقع الصحيح لنتيجة الكلاسيكو <strong class="text-yellow-200">1 - 2</strong></p>
+      <button id="close-celebration" class="close-celebration mt-6">مشاهدة النتيجة مرة أخرى</button>
+    </div>
+  </div>
 
   <script>
     const participants = [
@@ -78,6 +100,9 @@
     const announcement = document.getElementById('announcement');
     const winner = document.getElementById('winner');
     const remaining = document.getElementById('remaining');
+    const celebration = document.getElementById('celebration');
+    const celebrationImage = document.getElementById('celebration-image');
+    const celebrationName = document.getElementById('celebration-name');
 
     function drawWheel() {
       const n = available.length;
@@ -115,6 +140,10 @@
       setTimeout(() => {
         const selected = available[winningIndex];
         winner.textContent = selected.label; announcement.classList.remove('hidden');
+        celebrationImage.src = selected.image;
+        celebrationImage.alt = selected.label;
+        celebrationName.textContent = selected.label;
+        celebration.classList.add('show');
         document.querySelector(`[data-id="${selected.id}"]`).classList.add('winner');
         available = available.filter(item => item.id !== selected.id); remaining.textContent = available.length;
         rotation = target % 360; canvas.style.transition = 'none'; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
@@ -124,10 +153,12 @@
     }
 
     function reset() {
-      available = [...participants]; rotation = 0; spinning = false; spinButton.disabled = false; announcement.classList.add('hidden'); remaining.textContent = available.length; canvas.style.transition = 'none'; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
+      available = [...participants]; rotation = 0; spinning = false; spinButton.disabled = false; announcement.classList.add('hidden'); celebration.classList.remove('show'); remaining.textContent = available.length; canvas.style.transition = 'none'; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
     }
     spinButton.addEventListener('click', spin);
     document.getElementById('reset').addEventListener('click', reset);
+    document.getElementById('close-celebration').addEventListener('click', () => celebration.classList.remove('show'));
+    celebration.addEventListener('click', (event) => { if (event.target === celebration) celebration.classList.remove('show'); });
     drawWheel(); renderPeople();
   </script>
 </body>
