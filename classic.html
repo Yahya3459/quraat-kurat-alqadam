@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>قرعة الفائزين بالكلاسيكو | مركز الأمجاد</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js"></script>
+  <style>
+    body { font-family: 'Tajawal', sans-serif; background: #f4f7fb; }
+    .wheel-wrap { position: relative; width: min(88vw, 430px); aspect-ratio: 1; margin: auto; }
+    #wheel { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 18px 40px rgba(15, 54, 105, .2); transition: transform 5s cubic-bezier(.2,.75,.1,1); }
+    .pointer { position: absolute; z-index: 4; top: -13px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 22px solid transparent; border-right: 22px solid transparent; border-top: 42px solid #ef4444; filter: drop-shadow(0 4px 3px rgba(0,0,0,.25)); }
+    .spin { position: absolute; z-index: 5; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 88px; height: 88px; border-radius: 50%; border: 5px solid #0f766e; background: white; color: #115e59; font-weight: 900; font-size: 1.1rem; box-shadow: 0 7px 16px rgba(0,0,0,.18); }
+    .spin:disabled { opacity: .7; cursor: not-allowed; }
+    .person-card { transition: opacity .25s, transform .25s; }
+    .person-card.used { opacity: .42; transform: scale(.98); }
+    .person-card.winner { outline: 4px solid #10b981; transform: translateY(-5px); }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 px-4 py-6 md:py-10">
+  <main class="max-w-6xl mx-auto">
+    <header class="text-center mb-8">
+      <a href="index.html" class="inline-flex items-center gap-2 text-blue-700 font-bold mb-5 hover:text-blue-900">← العودة إلى صفحة القرعات</a>
+      <img src="alc_logo.svg" alt="شعار مركز الأمجاد" class="h-24 mx-auto object-contain" onerror="this.style.display='none'">
+      <p class="text-emerald-600 font-bold mt-3">توقع نتيجة الكلاسيكو بشكل صحيح</p>
+      <h1 class="text-3xl md:text-5xl font-black text-blue-900 mt-2">قرعة الفائزين</h1>
+      <p class="text-slate-500 mt-3">قرعة عشوائية لاختيار فائز واحد من الطلاب الثلاثة</p>
+    </header>
+
+    <section class="grid lg:grid-cols-2 gap-8 items-start">
+      <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-5 md:p-8 text-center">
+        <div class="flex justify-between items-center bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3 mb-7">
+          <span class="font-bold text-emerald-800">المشاركون</span>
+          <strong id="remaining" class="text-2xl text-emerald-600">3</strong>
+        </div>
+        <div class="wheel-wrap">
+          <div class="pointer"></div>
+          <canvas id="wheel" width="600" height="600"></canvas>
+          <button id="spin" class="spin">اسحب</button>
+        </div>
+        <div id="announcement" class="hidden mt-7 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-5">
+          <p class="text-emerald-700 font-bold">الفائز في القرعة</p>
+          <h2 id="winner" class="text-3xl font-black text-emerald-700 mt-1"></h2>
+          <p class="text-slate-500 mt-2">مبروك! نتمنى لك الفوز بالجائزة.</p>
+        </div>
+        <div class="flex justify-center gap-3 mt-7">
+          <button id="reset" class="rounded-xl bg-slate-200 hover:bg-slate-300 px-5 py-3 font-bold text-slate-700">إعادة القرعة</button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-5 md:p-8">
+        <div class="flex items-center justify-between border-b pb-4 mb-5">
+          <h2 class="text-2xl font-black text-blue-900">الفائزون الثلاثة</h2>
+          <span class="rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-bold">توقع 1 - 2</span>
+        </div>
+        <div id="people" class="grid sm:grid-cols-3 lg:grid-cols-1 gap-4"></div>
+      </div>
+    </section>
+    <footer class="text-center text-sm text-slate-400 mt-8">Created by <span class="font-bold text-blue-700">Eng. Yahya Al-Marisi</span></footer>
+  </main>
+
+  <script>
+    const participants = [
+      { id: 1, label: 'الفائز الأول', image: 'assets/winner-1.jpg' },
+      { id: 2, label: 'الفائز الثاني', image: 'assets/winner-2.jpg' },
+      { id: 3, label: 'الفائز الثالث', image: 'assets/winner-3.jpg' }
+    ];
+    let available = [...participants];
+    let rotation = 0;
+    let spinning = false;
+    const colors = ['#1769aa', '#10b981', '#f59e0b'];
+    const canvas = document.getElementById('wheel');
+    const ctx = canvas.getContext('2d');
+    const spinButton = document.getElementById('spin');
+    const people = document.getElementById('people');
+    const announcement = document.getElementById('announcement');
+    const winner = document.getElementById('winner');
+    const remaining = document.getElementById('remaining');
+
+    function drawWheel() {
+      const n = available.length;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!n) {
+        ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(300, 300, 300, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#64748b'; ctx.font = '900 34px Tajawal'; ctx.textAlign = 'center'; ctx.fillText('اكتملت القرعة', 300, 300); return;
+      }
+      const slice = (Math.PI * 2) / n;
+      for (let i = 0; i < n; i++) {
+        const start = i * slice, end = start + slice;
+        ctx.beginPath(); ctx.moveTo(300, 300); ctx.arc(300, 300, 300, start, end); ctx.closePath();
+        ctx.fillStyle = colors[i % colors.length]; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.stroke();
+        ctx.save(); ctx.translate(300, 300); ctx.rotate(start + slice / 2); ctx.fillStyle = '#fff'; ctx.font = '900 28px Tajawal'; ctx.textAlign = 'right'; ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 4; ctx.fillText(available[i].label, 255, 10); ctx.restore();
+      }
+    }
+
+    function renderPeople() {
+      people.innerHTML = participants.map(person => {
+        const isAvailable = available.some(item => item.id === person.id);
+        return `<article class="person-card ${isAvailable ? '' : 'used'} rounded-2xl border border-slate-200 bg-slate-50 p-3 flex lg:flex-row flex-col items-center gap-3 text-center lg:text-right" data-id="${person.id}">
+          <img src="${person.image}" alt="${person.label}" class="h-28 w-24 lg:h-24 lg:w-20 object-cover rounded-xl shadow-sm">
+          <div><h3 class="font-black text-blue-900">${person.label}</h3><p class="text-sm text-slate-500 mt-1">توقع صحيح: <b class="text-emerald-600">1 - 2</b></p></div>
+        </article>`;
+      }).join('');
+    }
+
+    function spin() {
+      if (spinning || available.length === 0) return;
+      spinning = true; spinButton.disabled = true; announcement.classList.add('hidden');
+      const winningIndex = Math.floor(Math.random() * available.length);
+      const slice = 360 / available.length;
+      const target = rotation + (6 + Math.floor(Math.random() * 4)) * 360 + (270 - (winningIndex * slice + slice / 2) - rotation) % 360;
+      canvas.style.transition = 'transform 5s cubic-bezier(.2,.75,.1,1)'; canvas.style.transform = `rotate(${target}deg)`;
+      setTimeout(() => {
+        const selected = available[winningIndex];
+        winner.textContent = selected.label; announcement.classList.remove('hidden');
+        document.querySelector(`[data-id="${selected.id}"]`).classList.add('winner');
+        available = available.filter(item => item.id !== selected.id); remaining.textContent = available.length;
+        rotation = target % 360; canvas.style.transition = 'none'; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
+        try { if (typeof confetti === 'function') confetti({ particleCount: 140, spread: 75, origin: { y: .6 }, colors: ['#1769aa', '#10b981', '#f59e0b'] }); } catch (_) {}
+        spinning = false;
+      }, 5150);
+    }
+
+    function reset() {
+      available = [...participants]; rotation = 0; spinning = false; spinButton.disabled = false; announcement.classList.add('hidden'); remaining.textContent = available.length; canvas.style.transition = 'none'; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
+    }
+    spinButton.addEventListener('click', spin);
+    document.getElementById('reset').addEventListener('click', reset);
+    drawWheel(); renderPeople();
+  </script>
+</body>
+</html>
