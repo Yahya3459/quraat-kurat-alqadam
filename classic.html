@@ -10,10 +10,13 @@
   <style>
     body { font-family: 'Tajawal', sans-serif; background: #f4f7fb; }
     .wheel-wrap { position: relative; width: min(88vw, 430px); aspect-ratio: 1; margin: auto; }
-    #wheel { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 18px 40px rgba(15, 54, 105, .2); transition: transform 5s cubic-bezier(.2,.75,.1,1); }
+    #wheel { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 18px 40px rgba(15, 54, 105, .2); }
     .pointer { position: absolute; z-index: 4; top: -13px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 22px solid transparent; border-right: 22px solid transparent; border-top: 42px solid #ef4444; filter: drop-shadow(0 4px 3px rgba(0,0,0,.25)); }
-    .spin { position: absolute; z-index: 5; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 88px; height: 88px; border-radius: 50%; border: 5px solid #0f766e; background: white; color: #115e59; font-weight: 900; font-size: 1.1rem; box-shadow: 0 7px 16px rgba(0,0,0,.18); }
-    .spin:disabled { opacity: .7; cursor: not-allowed; }
+    .wheel-hub { position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 74px; height: 74px; display: grid; place-items: center; border: 6px solid white; border-radius: 50%; background: #0f766e; color: white; font-size: 1.7rem; box-shadow: 0 5px 18px rgba(0,0,0,.25); pointer-events: none; }
+    .spin { width: min(100%, 430px); min-height: 72px; border: 0; border-radius: 1.25rem; background: linear-gradient(135deg, #0f766e, #059669); color: white; font-weight: 900; font-size: clamp(1.2rem, 4vw, 1.65rem); box-shadow: 0 12px 25px rgba(5, 150, 105, .28); transition: transform .12s, filter .12s, box-shadow .12s; }
+    .spin:hover { filter: brightness(1.06); box-shadow: 0 15px 30px rgba(5, 150, 105, .35); }
+    .spin:active { transform: scale(.98); }
+    .spin:focus-visible { outline: 4px solid #fbbf24; outline-offset: 4px; }
     .person-card { transition: opacity .25s, transform .25s; }
     .person-card.used { opacity: .42; transform: scale(.98); }
     .person-card.winner { outline: 4px solid #10b981; transform: translateY(-5px); }
@@ -49,8 +52,10 @@
         <div class="wheel-wrap">
           <div class="pointer"></div>
           <canvas id="wheel" width="600" height="600"></canvas>
-          <button id="spin" class="spin">اسحب</button>
+          <div class="wheel-hub" aria-hidden="true">★</div>
         </div>
+        <button id="spin" class="spin mt-2" type="button" aria-live="polite">ابدأ الدوران</button>
+        <p id="spin-hint" class="text-sm text-slate-500 mt-3">اضغط لبدء الدوران السريع، ثم اضغط الزر نفسه لإيقاف العجلة فورًا وإعلان الفائز.</p>
         <div id="announcement" class="hidden mt-7 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-5">
           <p class="text-emerald-700 font-bold">الفائز بالجائزة</p>
           <h2 id="winner" class="text-3xl font-black text-emerald-700 mt-1"></h2>
@@ -92,6 +97,8 @@
     let available = [...participants];
     let rotation = 0;
     let spinning = false;
+    let animationFrame = null;
+    let previousFrameTime = null;
     const colors = ['#1769aa', '#10b981', '#f59e0b'];
     const canvas = document.getElementById('wheel');
     const ctx = canvas.getContext('2d');
@@ -130,32 +137,63 @@
       }).join('');
     }
 
-    function spin() {
+    function animateSpin(timestamp) {
+      if (!spinning) return;
+      if (previousFrameTime !== null) rotation += (timestamp - previousFrameTime) * 0.9;
+      previousFrameTime = timestamp;
+      canvas.style.transform = `rotate(${rotation}deg)`;
+      animationFrame = requestAnimationFrame(animateSpin);
+    }
+
+    function startSpin() {
       if (spinning || available.length === 0) return;
-      spinning = true; spinButton.disabled = true; announcement.classList.add('hidden');
-      const winningIndex = Math.floor(Math.random() * available.length);
-      const slice = 360 / available.length;
-      const target = rotation + (6 + Math.floor(Math.random() * 4)) * 360 + (270 - (winningIndex * slice + slice / 2) - rotation) % 360;
-      canvas.style.transition = 'transform 5s cubic-bezier(.2,.75,.1,1)'; canvas.style.transform = `rotate(${target}deg)`;
-      setTimeout(() => {
-        const selected = available[winningIndex];
-        winner.textContent = selected.label; announcement.classList.remove('hidden');
-        celebrationImage.src = selected.image;
-        celebrationImage.alt = selected.label;
-        celebrationName.textContent = selected.label;
-        celebration.classList.add('show');
-        document.querySelector(`[data-id="${selected.id}"]`).classList.add('winner');
-        available = available.filter(item => item.id !== selected.id); remaining.textContent = available.length;
-        rotation = target % 360; canvas.style.transition = 'none'; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
-        try { if (typeof confetti === 'function') confetti({ particleCount: 140, spread: 75, origin: { y: .6 }, colors: ['#1769aa', '#10b981', '#f59e0b'] }); } catch (_) {}
-        spinning = false;
-      }, 5150);
+      spinning = true;
+      previousFrameTime = null;
+      announcement.classList.add('hidden');
+      celebration.classList.remove('show');
+      spinButton.textContent = 'أوقف الآن وأعلن الفائز';
+      spinButton.setAttribute('aria-label', 'أوقف القرعة الآن وأعلن الفائز');
+      animationFrame = requestAnimationFrame(animateSpin);
+    }
+
+    function stopSpin() {
+      if (!spinning || available.length === 0) return;
+      spinning = false;
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+      previousFrameTime = null;
+
+      // احسب الشريحة الموجودة تحت المؤشر العلوي عند لحظة الضغط نفسها.
+      const pointerAngle = ((270 - (rotation % 360)) % 360 + 360) % 360;
+      const winningIndex = Math.floor(pointerAngle / (360 / available.length)) % available.length;
+      const selected = available[winningIndex];
+      winner.textContent = selected.label; announcement.classList.remove('hidden');
+      celebrationImage.src = selected.image;
+      celebrationImage.alt = selected.label;
+      celebrationName.textContent = selected.label;
+      celebration.classList.add('show');
+      available = available.filter(item => item.id !== selected.id);
+      remaining.textContent = available.length;
+      rotation = 0;
+      canvas.style.transform = 'rotate(0deg)';
+      drawWheel();
+      renderPeople();
+      spinButton.textContent = available.length ? 'ابدأ الدوران' : 'اكتملت القرعة';
+      spinButton.setAttribute('aria-label', available.length ? 'ابدأ الدوران' : 'اكتملت القرعة');
+      spinButton.disabled = available.length === 0;
+      try { if (typeof confetti === 'function') confetti({ particleCount: 140, spread: 75, origin: { y: .6 }, colors: ['#1769aa', '#10b981', '#f59e0b'] }); } catch (_) {}
+    }
+
+    function toggleSpin() {
+      if (spinning) stopSpin();
+      else startSpin();
     }
 
     function reset() {
-      available = [...participants]; rotation = 0; spinning = false; spinButton.disabled = false; announcement.classList.add('hidden'); celebration.classList.remove('show'); remaining.textContent = available.length; canvas.style.transition = 'none'; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      available = [...participants]; rotation = 0; spinning = false; animationFrame = null; previousFrameTime = null; spinButton.disabled = false; spinButton.textContent = 'ابدأ الدوران'; spinButton.setAttribute('aria-label', 'ابدأ الدوران'); announcement.classList.add('hidden'); celebration.classList.remove('show'); remaining.textContent = available.length; canvas.style.transform = 'rotate(0deg)'; drawWheel(); renderPeople();
     }
-    spinButton.addEventListener('click', spin);
+    spinButton.addEventListener('click', toggleSpin);
     document.getElementById('reset').addEventListener('click', reset);
     document.getElementById('close-celebration').addEventListener('click', () => celebration.classList.remove('show'));
     celebration.addEventListener('click', (event) => { if (event.target === celebration) celebration.classList.remove('show'); });
